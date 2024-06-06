@@ -22,9 +22,20 @@ SDL_Surface* gScreenSurface = NULL;
 
 //The image we will load and show on the screen
 SDL_Surface* gHelloWorld = NULL;
+SDL_Surface* optHelloWorld = NULL;
 
-bool init()
-{
+SDL_Surface* gXOut = NULL;
+SDL_Surface* optXOut = NULL;
+
+SDL_Rect* pos[2];
+
+bool init(){
+    SDL_Rect* p1 = (SDL_Rect*)malloc(1024);
+    *p1 = SDL_Rect{x : 0, y : 0, w : 200, h : 200};
+    SDL_Rect* p2 = (SDL_Rect*)malloc(1024);
+    *p2 = SDL_Rect{x : 200, y : 200, w : 200, h : 200};
+    pos[0] = p1;
+    pos[1] = p2;
 	//Initialization flag
 	bool success = true;
 
@@ -53,38 +64,46 @@ bool init()
 	return success;
 }
 
-bool loadMedia()
-{
+bool loadMedia(){
 	//Loading success flag
 	bool success = true;
 
 	//Load splash image
-	gHelloWorld = SDL_LoadBMP( "hello_world.bmp" );
-	if( gHelloWorld == NULL )
-	{
-		printf( "Unable to load image %s! SDL Error: %s\n", "02_getting_an_image_on_the_screen/hello_world.bmp", SDL_GetError() );
+	gHelloWorld = SDL_LoadBMP("hello_world.bmp");
+    gXOut = SDL_LoadBMP("actual-2.bmp");
+	if (gHelloWorld == NULL ){
+		printf( "Unable to load image %s! SDL Error: %s\n", "hello_world.bmp", SDL_GetError() );
 		success = false;
-	}
+    }
+
+    if (gXOut == NULL) {
+		printf( "Unable to load image %s! SDL Error: %s\n", "hello_world.bmp", SDL_GetError() );
+		success = false;
+    }
 
 	return success;
 }
 
-void close()
-{
+void close(){
 	//Deallocate surface
-	SDL_FreeSurface( gHelloWorld );
+	SDL_FreeSurface(gHelloWorld);
 	gHelloWorld = NULL;
-
+    SDL_FreeSurface(gXOut);
+    gXOut = NULL;
 	//Destroy window
-	SDL_DestroyWindow( gWindow );
+	SDL_DestroyWindow(gWindow);
 	gWindow = NULL;
+
+
+    
+    free(pos[0]);
+    free(pos[1]);
 
 	//Quit SDL subsystems
 	SDL_Quit();
 }
 
-int main( int argc, char* args[] )
-{
+int main( int argc, char* args[] ){
 	//Start up SDL and create window
 	if( !init() )
 	{
@@ -100,10 +119,8 @@ int main( int argc, char* args[] )
 		else
 		{
 			//Apply the image
-			SDL_BlitSurface( gHelloWorld, NULL, gScreenSurface, NULL );
-			
+			SDL_BlitSurface( gXOut, NULL, gScreenSurface, pos[0]);
 			//Update the surface
-			SDL_UpdateWindowSurface( gWindow );
 
             //Hack to get window to stay up
             SDL_Event e; 
@@ -112,10 +129,19 @@ int main( int argc, char* args[] )
                 while( SDL_PollEvent( &e ) ){ 
                     if( e.type == SDL_QUIT ) {
                         quit = true; 
-                    } else if (e.type == SDL_MO)
+                    } else if (e.type == SDL_MOUSEMOTION) {
+                        
+                    } else if (e.type == SDL_MOUSEBUTTONDOWN) {
+                        printf("Mouse button is DOWN.\n");
+                        SDL_BlitSurface( gHelloWorld, NULL, gScreenSurface, pos[1]);
+                    } else if (e.type == SDL_MOUSEBUTTONUP) {
+
+                    }
                 }
+                SDL_UpdateWindowSurface(gWindow);
 		    }
-	}
+	    }
+    }
 
 	//Free resources and close SDL
 	close();
