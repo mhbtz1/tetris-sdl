@@ -1,3 +1,7 @@
+/*This source code copyrighted by Lazy Foo' Productions 2004-2024
+and may not be redistributed without written permission.*/
+
+//Using SDL, SDL_image, standard IO, and strings
 #include <SDL.h>
 #include <SDL_image.h>
 #include <stdio.h>
@@ -239,7 +243,7 @@ bool loadMedia()
 	bool success = true;
 
 	//Load front alpha texture
-	if( !gModulatedTexture.loadFromFile( "assets/fadeout.png" ) )
+	if( !gModulatedTexture.loadFromFile( "13_alpha_blending/fadeout.png" ) )
 	{
 		printf( "Failed to load front texture!\n" );
 		success = false;
@@ -251,7 +255,7 @@ bool loadMedia()
 	}
 
 	//Load background texture
-	if( !gBackgroundTexture.loadFromFile( "assets/fadein.png" ) )
+	if( !gBackgroundTexture.loadFromFile( "13_alpha_blending/fadein.png" ) )
 	{
 		printf( "Failed to load background texture!\n" );
 		success = false;
