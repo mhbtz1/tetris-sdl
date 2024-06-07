@@ -1,4 +1,5 @@
 #include <SDL.h>
+#include <SDL_image.h>
 #include <stdio.h>
 
 //Screen dimension constants
@@ -16,10 +17,8 @@ void close();
 
 //The window we'll be rendering to
 SDL_Window* gWindow = NULL;
-	
 //The surface contained by the window
 SDL_Surface* gScreenSurface = NULL;
-
 //The image we will load and show on the screen
 SDL_Surface* gHelloWorld = NULL;
 SDL_Surface* optHelloWorld = NULL;
@@ -28,6 +27,7 @@ SDL_Surface* gXOut = NULL;
 SDL_Surface* optXOut = NULL;
 
 SDL_Rect* pos[2];
+SDL_Renderer* ren;
 
 bool init(){
     SDL_Rect* p1 = (SDL_Rect*)malloc(1024);
@@ -38,24 +38,19 @@ bool init(){
     pos[1] = p2;
 	//Initialization flag
 	bool success = true;
-
-	//Initialize SDL
-	if( SDL_Init( SDL_INIT_VIDEO ) < 0 )
-	{
+	
+    //Initialize SDL
+	if ( SDL_Init( SDL_INIT_VIDEO ) < 0 ){
 		printf( "SDL could not initialize! SDL_Error: %s\n", SDL_GetError() );
 		success = false;
-	}
-	else
-	{
+	} else {
 		//Create window
 		gWindow = SDL_CreateWindow( "SDL Tutorial", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN );
-		if( gWindow == NULL )
-		{
+        ren = SDL_CreateRenderer(gWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+		if( gWindow == NULL ) {
 			printf( "Window could not be created! SDL_Error: %s\n", SDL_GetError() );
 			success = false;
-		}
-		else
-		{
+		} else {
 			//Get window surface
 			gScreenSurface = SDL_GetWindowSurface( gWindow );
 		}
@@ -94,8 +89,6 @@ void close(){
 	SDL_DestroyWindow(gWindow);
 	gWindow = NULL;
 
-
-    
     free(pos[0]);
     free(pos[1]);
 
