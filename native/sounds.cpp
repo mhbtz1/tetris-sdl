@@ -1,25 +1,16 @@
+/*This source code copyrighted by Lazy Foo' Productions 2004-2024
+and may not be redistributed without written permission.*/
+
+//Using SDL, SDL_image, SDL_ttf, SDL_mixer, standard IO, math, and strings
 #include <SDL.h>
 #include <SDL_image.h>
+#include <SDL_mixer.h>
 #include <stdio.h>
 #include <string>
 
 //Screen dimension constants
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
-
-//Button constants
-const int BUTTON_WIDTH = 300;
-const int BUTTON_HEIGHT = 200;
-const int TOTAL_BUTTONS = 4;
-
-enum LButtonSprite
-{
-	BUTTON_SPRITE_MOUSE_OUT = 0,
-	BUTTON_SPRITE_MOUSE_OVER_MOTION = 1,
-	BUTTON_SPRITE_MOUSE_DOWN = 2,
-	BUTTON_SPRITE_MOUSE_UP = 3,
-	BUTTON_SPRITE_TOTAL = 4
-};
 
 //Texture wrapper class
 class LTexture
@@ -38,7 +29,7 @@ class LTexture
 		//Creates image from font string
 		bool loadFromRenderedText( std::string textureText, SDL_Color textColor );
 		#endif
-		
+
 		//Deallocates texture
 		void free();
 
@@ -67,30 +58,6 @@ class LTexture
 		int mHeight;
 };
 
-//The mouse button
-class LButton
-{
-	public:
-		//Initializes internal variables
-		LButton();
-
-		//Sets top left position
-		void setPosition( int x, int y );
-
-		//Handles mouse event
-		void handleEvent( SDL_Event* e );
-	
-		//Shows button sprite
-		void render();
-
-	private:
-		//Top left position
-		SDL_Point mPosition;
-
-		//Currently used global sprite
-		LButtonSprite mCurrentSprite;
-};
-
 //Starts up SDL and creates window
 bool init();
 
@@ -106,12 +73,18 @@ SDL_Window* gWindow = NULL;
 //The window renderer
 SDL_Renderer* gRenderer = NULL;
 
-//Mouse button sprites
-SDL_Rect gSpriteClips[ BUTTON_SPRITE_TOTAL ];
-LTexture gButtonSpriteSheetTexture;
+//Scene texture
+LTexture gPromptTexture;
 
-//Buttons objects
-LButton gButtons[ TOTAL_BUTTONS ]; 
+//The music that will be played
+Mix_Music *gMusic = NULL;
+
+//The sound effects that will be used
+Mix_Chunk *gScratch = NULL;
+Mix_Chunk *gHigh = NULL;
+Mix_Chunk *gMedium = NULL;
+Mix_Chunk *gLow = NULL;
+
 
 LTexture::LTexture()
 {
@@ -176,11 +149,7 @@ bool LTexture::loadFromRenderedText( std::string textureText, SDL_Color textColo
 
 	//Render text surface
 	SDL_Surface* textSurface = TTF_RenderText_Solid( gFont, textureText.c_str(), textColor );
-	if( textSurface == NULL )
-	{
-		printf( "Unable to render text surface! SDL_ttf Error: %s\n", TTF_GetError() );
-	}
-	else
+	if( textSurface != NULL )
 	{
 		//Create texture from surface pixels
         mTexture = SDL_CreateTextureFromSurface( gRenderer, textSurface );
@@ -198,6 +167,11 @@ bool LTexture::loadFromRenderedText( std::string textureText, SDL_Color textColo
 		//Get rid of old surface
 		SDL_FreeSurface( textSurface );
 	}
+	else
+	{
+		printf( "Unable to render text surface! SDL_ttf Error: %s\n", TTF_GetError() );
+	}
+
 	
 	//Return success
 	return mTexture != NULL;
@@ -260,93 +234,13 @@ int LTexture::getHeight()
 	return mHeight;
 }
 
-LButton::LButton()
-{
-	mPosition.x = 0;
-	mPosition.y = 0;
-
-	mCurrentSprite = BUTTON_SPRITE_MOUSE_OUT;
-}
-
-void LButton::setPosition( int x, int y )
-{
-	mPosition.x = x;
-	mPosition.y = y;
-}
-
-void LButton::handleEvent( SDL_Event* e )
-{
-	//If mouse event happened
-	if( e->type == SDL_MOUSEMOTION || e->type == SDL_MOUSEBUTTONDOWN || e->type == SDL_MOUSEBUTTONUP )
-	{
-		//Get mouse position
-		int x, y;
-		SDL_GetMouseState( &x, &y );
-
-		//Check if mouse is in button
-		bool inside = true;
-
-		//Mouse is left of the button
-		if( x < mPosition.x )
-		{
-			inside = false;
-		}
-		//Mouse is right of the button
-		else if( x > mPosition.x + BUTTON_WIDTH )
-		{
-			inside = false;
-		}
-		//Mouse above the button
-		else if( y < mPosition.y )
-		{
-			inside = false;
-		}
-		//Mouse below the button
-		else if( y > mPosition.y + BUTTON_HEIGHT )
-		{
-			inside = false;
-		}
-
-		//Mouse is outside button
-		if( !inside )
-		{
-			mCurrentSprite = BUTTON_SPRITE_MOUSE_OUT;
-		}
-		//Mouse is inside button
-		else
-		{
-			//Set mouse over sprite
-			switch( e->type )
-			{
-				case SDL_MOUSEMOTION:
-				mCurrentSprite = BUTTON_SPRITE_MOUSE_OVER_MOTION;
-				break;
-			
-				case SDL_MOUSEBUTTONDOWN:
-				mCurrentSprite = BUTTON_SPRITE_MOUSE_DOWN;
-				break;
-				
-				case SDL_MOUSEBUTTONUP:
-				mCurrentSprite = BUTTON_SPRITE_MOUSE_UP;
-				break;
-			}
-		}
-	}
-}
-	
-void LButton::render()
-{
-	//Show current button sprite
-	gButtonSpriteSheetTexture.render( mPosition.x, mPosition.y, &gSpriteClips[ mCurrentSprite ] );
-}
-
 bool init()
 {
 	//Initialization flag
 	bool success = true;
 
 	//Initialize SDL
-	if( SDL_Init( SDL_INIT_VIDEO ) < 0 )
+	if( SDL_Init( SDL_INIT_VIDEO | SDL_INIT_AUDIO ) < 0 )
 	{
 		printf( "SDL could not initialize! SDL Error: %s\n", SDL_GetError() );
 		success = false;
@@ -387,6 +281,13 @@ bool init()
 					printf( "SDL_image could not initialize! SDL_image Error: %s\n", IMG_GetError() );
 					success = false;
 				}
+
+				 //Initialize SDL_mixer
+				if( Mix_OpenAudio( 44100, MIX_DEFAULT_FORMAT, 2, 2048 ) < 0 )
+				{
+					printf( "SDL_mixer could not initialize! SDL_mixer Error: %s\n", Mix_GetError() );
+					success = false;
+				}
 			}
 		}
 	}
@@ -399,28 +300,48 @@ bool loadMedia()
 	//Loading success flag
 	bool success = true;
 
-	//Load sprites
-	if( !gButtonSpriteSheetTexture.loadFromFile("assets/button.png") )
+	//Load prompt texture
+	if( !gPromptTexture.loadFromFile( "assets/prompt.png" ) )
 	{
-		printf( "Failed to load button sprite texture!\n" );
+		printf( "Failed to load prompt texture!\n" );
 		success = false;
 	}
-	else
-	{
-		//Set sprites
-		for( int i = 0; i < BUTTON_SPRITE_TOTAL; ++i )
-		{
-			gSpriteClips[ i ].x = 0;
-			gSpriteClips[ i ].y = i * 200;
-			gSpriteClips[ i ].w = BUTTON_WIDTH;
-			gSpriteClips[ i ].h = BUTTON_HEIGHT;
-		}
 
-		//Set buttons in corners
-		gButtons[ 0 ].setPosition( 0, 0 );
-		gButtons[ 1 ].setPosition( SCREEN_WIDTH - BUTTON_WIDTH, 0 );
-		gButtons[ 2 ].setPosition( 0, SCREEN_HEIGHT - BUTTON_HEIGHT );
-		gButtons[ 3 ].setPosition( SCREEN_WIDTH - BUTTON_WIDTH, SCREEN_HEIGHT - BUTTON_HEIGHT );
+	//Load music
+	gMusic = Mix_LoadMUS( "sounds/beat.wav" );
+	if( gMusic == NULL )
+	{
+		printf( "Failed to load beat music! SDL_mixer Error: %s\n", Mix_GetError() );
+		success = false;
+	}
+	
+	//Load sound effects
+	gScratch = Mix_LoadWAV( "sounds/scratch.wav" );
+	if( gScratch == NULL )
+	{
+		printf( "Failed to load scratch sound effect! SDL_mixer Error: %s\n", Mix_GetError() );
+		success = false;
+	}
+	
+	gHigh = Mix_LoadWAV( "sounds/high.wav" );
+	if( gHigh == NULL )
+	{
+		printf( "Failed to load high sound effect! SDL_mixer Error: %s\n", Mix_GetError() );
+		success = false;
+	}
+
+	gMedium = Mix_LoadWAV( "sounds/medium.wav" );
+	if( gMedium == NULL )
+	{
+		printf( "Failed to load medium sound effect! SDL_mixer Error: %s\n", Mix_GetError() );
+		success = false;
+	}
+
+	gLow = Mix_LoadWAV( "sounds/low.wav" );
+	if( gLow == NULL )
+	{
+		printf( "Failed to load low sound effect! SDL_mixer Error: %s\n", Mix_GetError() );
+		success = false;
 	}
 
 	return success;
@@ -429,7 +350,21 @@ bool loadMedia()
 void close()
 {
 	//Free loaded images
-	gButtonSpriteSheetTexture.free();
+	gPromptTexture.free();
+
+	//Free the sound effects
+	Mix_FreeChunk( gScratch );
+	Mix_FreeChunk( gHigh );
+	Mix_FreeChunk( gMedium );
+	Mix_FreeChunk( gLow );
+	gScratch = NULL;
+	gHigh = NULL;
+	gMedium = NULL;
+	gLow = NULL;
+	
+	//Free the music
+	Mix_FreeMusic( gMusic );
+	gMusic = NULL;
 
 	//Destroy window	
 	SDL_DestroyRenderer( gRenderer );
@@ -438,6 +373,7 @@ void close()
 	gRenderer = NULL;
 
 	//Quit SDL subsystems
+	Mix_Quit();
 	IMG_Quit();
 	SDL_Quit();
 }
@@ -475,11 +411,61 @@ int main( int argc, char* args[] )
 					{
 						quit = true;
 					}
-					
-					//Handle button events
-					for( int i = 0; i < TOTAL_BUTTONS; ++i )
+					//Handle key press
+					else if( e.type == SDL_KEYDOWN )
 					{
-						gButtons[ i ].handleEvent( &e );
+						switch( e.key.keysym.sym )
+						{
+							//Play high sound effect
+							case SDLK_1:
+							Mix_PlayChannel( -1, gHigh, 0 );
+							break;
+							
+							//Play medium sound effect
+							case SDLK_2:
+							Mix_PlayChannel( -1, gMedium, 0 );
+							break;
+							
+							//Play low sound effect
+							case SDLK_3:
+							Mix_PlayChannel( -1, gLow, 0 );
+							break;
+							
+							//Play scratch sound effect
+							case SDLK_4:
+							Mix_PlayChannel( -1, gScratch, 0 );
+							break;
+							
+							case SDLK_9:
+							//If there is no music playing
+							if( Mix_PlayingMusic() == 0 )
+							{
+								//Play the music
+								Mix_PlayMusic( gMusic, -1 );
+							}
+							//If music is being played
+							else
+							{
+								//If the music is paused
+								if( Mix_PausedMusic() == 1 )
+								{
+									//Resume the music
+									Mix_ResumeMusic();
+								}
+								//If the music is playing
+								else
+								{
+									//Pause the music
+									Mix_PauseMusic();
+								}
+							}
+							break;
+							
+							case SDLK_0:
+							//Stop the music
+							Mix_HaltMusic();
+							break;
+						}
 					}
 				}
 
@@ -487,11 +473,8 @@ int main( int argc, char* args[] )
 				SDL_SetRenderDrawColor( gRenderer, 0xFF, 0xFF, 0xFF, 0xFF );
 				SDL_RenderClear( gRenderer );
 
-				//Render buttons
-				for( int i = 0; i < TOTAL_BUTTONS; ++i )
-				{
-					gButtons[ i ].render();
-				}
+				//Render prompt
+				gPromptTexture.render( 0, 0 );
 
 				//Update screen
 				SDL_RenderPresent( gRenderer );
@@ -504,4 +487,3 @@ int main( int argc, char* args[] )
 
 	return 0;
 }
-
